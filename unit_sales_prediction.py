@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 from statsmodels.tsa.deterministic import CalendarFourier, DeterministicProcess
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import OneHotEncoder
 
 __author__ = 'Ben Spivey'
 __license__ = 'GNU GPLv3'
@@ -72,12 +73,13 @@ class UnitSalesPrediction:
 
     def create_seasonal_features(self, df_merged_store):
         """Creates seasonal features for one item and one store"""
-        y = df_merged_store['unit_sales']
+        df_copy = df_merged_store.copy(deep=True)
+        y = df_copy['unit_sales']
 
-        df_merged_store['date'] = pd.DatetimeIndex(df_merged_store['date'])
-        df_merged_store.set_index('date', inplace=True)
+        df_copy['date'] = pd.DatetimeIndex(df_copy['date'])
+        df_copy.set_index('date', inplace=True)
         fourier = CalendarFourier(freq='A', order=16)
-        dp = DeterministicProcess(index=df_merged_store.index,
+        dp = DeterministicProcess(index=df_copy.index,
                                     constant=True,
                                     order=1,
                                     seasonal=True,
@@ -87,13 +89,27 @@ class UnitSalesPrediction:
 
         return X, y
 
-    def predict_unit_sales(self, X, y):
+    def predict_unit_sales(self, df_merged_store, X, y):
         """Predicts unit sales for one item and one store"""
-        model = LinearRegression().fit(X, y)
-        y_pred = pd.Series(model.predict(X),
-                            index=X.index,
+        df_copy = df_merged_store.copy(deep=True).fillna('')
+        df_copy = df_copy[['date', 'event_name_1']]
+        df_copy['date'] = pd.DatetimeIndex(df_copy['date'])
+        df_copy.set_index('date', inplace=True)
+
+        ohe = OneHotEncoder(sparse=False)
+        X_events = pd.DataFrame(
+            ohe.fit_transform(df_copy),
+            index=df_copy.index,
+            columns=df_copy['event_name_1'].unique(),
+        )
+        print(X.dtypes)
+        print(X_events.dtypes)
+        X2 = X.join(X_events, on='date').fillna(0.0)
+        model = LinearRegression().fit(X2, y)
+        y_pred = pd.Series(model.predict(X2),
+                            index=X2.index,
                             name='Predicted')
-        
+
         return y_pred
 
     def plot_predictions(self, X, y, y_pred):
@@ -134,7 +150,7 @@ if __name__ == '__main__':
 
     df_merged_store = df_merged[df_merged['store_id']=='TX_1']
     X, y = unit_sales_prediction.create_seasonal_features(df_merged_store)
-    y_pred = unit_sales_prediction.predict_unit_sales(X, y)
+    y_pred = unit_sales_prediction.predict_unit_sales(df_merged_store, X, y)
     unit_sales_prediction.plot_predictions(X, y, y_pred)
 
     #unit_sales_prediction.plot_sales(df_merged)

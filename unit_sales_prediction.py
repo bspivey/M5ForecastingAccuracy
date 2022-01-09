@@ -76,7 +76,7 @@ class UnitSalesPrediction:
 
         df_merged_store['date'] = pd.DatetimeIndex(df_merged_store['date'])
         df_merged_store.set_index('date', inplace=True)
-        fourier = CalendarFourier(freq='A', order=4)
+        fourier = CalendarFourier(freq='A', order=16)
         dp = DeterministicProcess(index=df_merged_store.index,
                                     constant=True,
                                     order=1,

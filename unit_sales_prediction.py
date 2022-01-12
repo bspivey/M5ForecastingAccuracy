@@ -59,11 +59,6 @@ class UnitSalesPrediction:
                                                     how='left',
                                                     on='wm_yr_wk')
 
-        print('merge_tables')
-        print(df_intermediate_item.head(5))
-        print(df_stvp_item.head(5))
-        print(df_sell_prices_item.head(5))
-
         cols_to_use = df_intermediate_item.columns.difference(df_stvp_item.columns).tolist()
         cols_to_use = cols_to_use + ['item_id', 'd', 'store_id']
         df_merged = df_stvp_item.merge(df_intermediate_item[cols_to_use],
@@ -137,9 +132,6 @@ class UnitSalesPrediction:
         value_vars = ['y', 'y_pred']
         df_tall = pd.melt(df_wide, id_vars='date', value_vars=value_vars, var_name='y_label', value_name='y_value')
 
-        #print('df_tall')
-        #print(df_tall.head(10))
-
         fig = px.line(df_tall, x='date', y='y_value', color='y_label')
         fig.show()
 
@@ -161,15 +153,9 @@ if __name__ == '__main__':
     item_name = 'FOODS_3_069'
     df_stvp_item, df_sell_prices_item = unit_sales_prediction.filter_by_item(item_name)
     df_merged = unit_sales_prediction.merge_tables(df_stvp_item, df_sell_prices_item)
-
-    print('main')
-    pd.set_option('display.max_columns', None)
-    print(df_merged.head(5))
-
     df_merged_store = df_merged[df_merged['store_id']=='TX_1']
 
     # Create training, validation, and test data
-    print(df_merged_store.columns)
     X_seasonal, y = unit_sales_prediction.create_seasonal_features(df_merged_store)
     X_events = unit_sales_prediction.create_event_features(df_merged_store)
     X_s_train, X_s_validation, X_s_test = unit_sales_prediction.split_train_test_data(X_seasonal)
@@ -182,5 +168,3 @@ if __name__ == '__main__':
     # Make predictions
     y_pred = unit_sales_prediction.predict_unit_sales(model, X_s_validation, X_e_validation)
     unit_sales_prediction.plot_predictions(X_s_validation, y_validation, y_pred)
-
-    #unit_sales_prediction.plot_sales(df_merged)

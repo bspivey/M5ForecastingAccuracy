@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """Class to predict unit sales from M5 Forecasting Accuracy data"""
 
+from re import U
 import numpy as np
 import scipy as sp
 import pandas as pd
@@ -71,6 +72,15 @@ class UnitSalesPrediction:
 
         return df_merged
 
+    def split_train_test_data(self, df_merged):
+        """Split df_merged into train, validation, and test data"""
+        days_in_year = 365
+        df_train = df_merged.iloc[:-2*days_in_year].copy(deep=True)
+        df_validation = df_merged.iloc[-2*days_in_year:-days_in_year].copy(deep=True)
+        df_test = df_merged.iloc[-days_in_year:].copy(deep=True)
+
+        return df_train, df_validation, df_test
+
     def create_seasonal_features(self, df_merged_store):
         """Creates seasonal features for one item and one store"""
         df_copy = df_merged_store.copy(deep=True)
@@ -89,8 +99,7 @@ class UnitSalesPrediction:
 
         return X, y
 
-    def predict_unit_sales(self, df_merged_store, X, y):
-        """Predicts unit sales for one item and one store"""
+    def create_event_features(self, df_merged_store):
         df_copy = df_merged_store.copy(deep=True).fillna('')
         df_copy = df_copy[['date', 'event_name_1']]
         df_copy['date'] = pd.DatetimeIndex(df_copy['date'])
@@ -102,14 +111,23 @@ class UnitSalesPrediction:
             index=df_copy.index,
             columns=df_copy['event_name_1'].unique(),
         )
-        print(X.dtypes)
-        print(X_events.dtypes)
-        X2 = X.join(X_events, on='date').fillna(0.0)
-        model = LinearRegression().fit(X2, y)
-        y_pred = pd.Series(model.predict(X2),
-                            index=X2.index,
-                            name='Predicted')
 
+        return X_events
+
+    def fit_unit_sales_model(self, X_seasonal, X_events, y):
+        """Trains a model to predict unit sales for one item and one store"""
+        
+        X = X_seasonal.join(X_events, on='date').fillna(0.0)
+        model = LinearRegression().fit(X, y)
+
+        return model
+    
+    def predict_unit_sales(self, model, X_seasonal, X_events):
+        X = X_seasonal.join(X_events, on='date').fillna(0.0)
+        y_pred = pd.Series(model.predict(X),
+                    index=X.index,
+                    name='Predicted')
+        
         return y_pred
 
     def plot_predictions(self, X, y, y_pred):
@@ -119,8 +137,8 @@ class UnitSalesPrediction:
         value_vars = ['y', 'y_pred']
         df_tall = pd.melt(df_wide, id_vars='date', value_vars=value_vars, var_name='y_label', value_name='y_value')
 
-        print('df_tall')
-        print(df_tall.head(10))
+        #print('df_tall')
+        #print(df_tall.head(10))
 
         fig = px.line(df_tall, x='date', y='y_value', color='y_label')
         fig.show()
@@ -149,8 +167,20 @@ if __name__ == '__main__':
     print(df_merged.head(5))
 
     df_merged_store = df_merged[df_merged['store_id']=='TX_1']
-    X, y = unit_sales_prediction.create_seasonal_features(df_merged_store)
-    y_pred = unit_sales_prediction.predict_unit_sales(df_merged_store, X, y)
-    unit_sales_prediction.plot_predictions(X, y, y_pred)
+
+    # Create training, validation, and test data
+    print(df_merged_store.columns)
+    X_seasonal, y = unit_sales_prediction.create_seasonal_features(df_merged_store)
+    X_events = unit_sales_prediction.create_event_features(df_merged_store)
+    X_s_train, X_s_validation, X_s_test = unit_sales_prediction.split_train_test_data(X_seasonal)
+    y_train, y_validation, y_test = unit_sales_prediction.split_train_test_data(y)
+    X_e_train, X_e_validation, X_e_test = unit_sales_prediction.split_train_test_data(X_events)
+
+    # Train the model
+    model = unit_sales_prediction.fit_unit_sales_model(X_s_train, X_e_train, y_train)
+
+    # Make predictions
+    y_pred = unit_sales_prediction.predict_unit_sales(model, X_s_validation, X_e_validation)
+    unit_sales_prediction.plot_predictions(X_s_validation, y_validation, y_pred)
 
     #unit_sales_prediction.plot_sales(df_merged)

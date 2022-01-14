@@ -130,7 +130,11 @@ class UnitSalesPrediction:
         columns = ['date', 'y', 'y_pred']
         df_wide = pd.DataFrame(list_of_tuples, columns=columns)
         value_vars = ['y', 'y_pred']
-        df_tall = pd.melt(df_wide, id_vars='date', value_vars=value_vars, var_name='y_label', value_name='y_value')
+        df_tall = pd.melt(df_wide,
+                            id_vars='date',
+                            value_vars=value_vars,
+                            var_name='y_label',
+                            value_name='y_value')
 
         fig = px.line(df_tall, x='date', y='y_value', color='y_label')
         fig.show()
@@ -140,31 +144,34 @@ class UnitSalesPrediction:
         df_sales_rolling_avg = df_merged_pivot.rolling(7).mean()
         id_vars = ['d']
         store_ids = df_merged['store_id'].unique()
-        df_sales_rolling_avg = pd.melt(df_sales_rolling_avg.reset_index(), id_vars=id_vars,
-                                        value_vars=store_ids, var_name='store_id', value_name='unit_sales')
+        df_sales_rolling_avg = pd.melt(df_sales_rolling_avg.reset_index(),
+                                        id_vars=id_vars,
+                                        value_vars=store_ids,
+                                        var_name='store_id',
+                                        value_name='unit_sales')
 
         fig = px.line(df_sales_rolling_avg, x='d', y='unit_sales', color='store_id')
         fig.show()
 
 if __name__ == '__main__':
-    unit_sales_prediction = UnitSalesPrediction()
-    unit_sales_prediction.read_data()
+    usp = UnitSalesPrediction()
+    usp.read_data()
 
     item_name = 'FOODS_3_069'
-    df_stvp_item, df_sell_prices_item = unit_sales_prediction.filter_by_item(item_name)
-    df_merged = unit_sales_prediction.merge_tables(df_stvp_item, df_sell_prices_item)
+    df_stvp_item, df_sell_prices_item = usp.filter_by_item(item_name)
+    df_merged = usp.merge_tables(df_stvp_item, df_sell_prices_item)
     df_merged_store = df_merged[df_merged['store_id']=='TX_1']
 
     # Create training, validation, and test data
-    X_seasonal, y = unit_sales_prediction.create_seasonal_features(df_merged_store)
-    X_events = unit_sales_prediction.create_event_features(df_merged_store)
-    X_s_train, X_s_validation, X_s_test = unit_sales_prediction.split_train_test_data(X_seasonal)
-    y_train, y_validation, y_test = unit_sales_prediction.split_train_test_data(y)
-    X_e_train, X_e_validation, X_e_test = unit_sales_prediction.split_train_test_data(X_events)
+    X_seasonal, y = usp.create_seasonal_features(df_merged_store)
+    X_events = usp.create_event_features(df_merged_store)
+    X_s_train, X_s_validation, X_s_test = usp.split_train_test_data(X_seasonal)
+    y_train, y_validation, y_test = usp.split_train_test_data(y)
+    X_e_train, X_e_validation, X_e_test = usp.split_train_test_data(X_events)
 
     # Train the model
-    model = unit_sales_prediction.fit_unit_sales_model(X_s_train, X_e_train, y_train)
+    model = usp.fit_unit_sales_model(X_s_train, X_e_train, y_train)
 
     # Make predictions
-    y_pred = unit_sales_prediction.predict_unit_sales(model, X_s_validation, X_e_validation)
-    unit_sales_prediction.plot_predictions(X_s_validation, y_validation, y_pred)
+    y_pred = usp.predict_unit_sales(model, X_s_validation, X_e_validation)
+    usp.plot_predictions(X_s_validation, y_validation, y_pred)
